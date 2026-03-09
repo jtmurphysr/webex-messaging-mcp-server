@@ -1,0 +1,122 @@
+name: Agent Dispatch
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # ─────────────────────────────────────────
+  # Trigger agent on issue labeled `agent-task`
+  # ─────────────────────────────────────────
+  dispatch-on-label:
+    name: Dispatch Agent
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issues' &&
+      github.event.label.name == 'agent-task' &&
+      !contains(github.event.issue.labels.*.name, 'human-review') &&
+      !contains(github.event.issue.labels.*.name, 'harness-gap')
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Post dispatch acknowledgment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🤖 **Agent dispatched.**\nReading `AGENTS.md` and issue spec. Will open a PR when complete.\n_Add `human-review` label at any time to block auto-merge._\n_Comment `/agent retry` to re-dispatch if needed._'
+            });
+
+      - name: Run Claude Code agent
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            You are operating in an agent-first repository. This is a Node.js project (plain JavaScript, not TypeScript).
+
+            FIRST: Read AGENTS.md in full. It is your operating constitution.
+            SECOND: Read docs/PRD.md for the full product specification.
+            THIRD: Read the issue #${{ github.event.issue.number }} in full.
+
+            Build exactly what the issue specifies. Follow every convention in AGENTS.md.
+            Run `npm run validate` before opening a PR — all tests must pass.
+            Run `node index.js tools` to verify all 52 existing tools still load.
+
+            When you are done, verify the Definition of Done checklist in AGENTS.md before opening a PR.
+
+            If you encounter a missing capability that blocks you, do NOT approximate.
+            Open a separate issue with label `harness-gap` and comment on this issue referencing it.
+
+  # ─────────────────────────────────────────
+  # Retry agent on `/agent retry` comment
+  # ─────────────────────────────────────────
+  retry-on-comment:
+    name: Retry Agent
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '/agent retry') &&
+      contains(github.event.issue.labels.*.name, 'agent-task') &&
+      !contains(github.event.issue.labels.*.name, 'human-review')
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Post retry acknowledgment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🔄 **Agent retrying.**\nRe-reading `AGENTS.md` and issue spec.'
+            });
+
+      - name: Run Claude Code agent
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            You are retrying a previous attempt. This is a Node.js project (plain JavaScript, not TypeScript).
+
+            FIRST: Read AGENTS.md in full.
+            SECOND: Read docs/PRD.md for the full product specification.
+            THIRD: Read issue #${{ github.event.issue.number }} in full.
+            FOURTH: Read all previous comments on this issue for context on what failed.
+
+            Fix whatever went wrong and open a clean PR.
+            Run `npm run validate` before opening a PR — all tests must pass.
+            Run `node index.js tools` to verify all 52 existing tools still load.

@@ -1,0 +1,35 @@
+name: Close Issue on Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  close-issue:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Close linked issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const matches = body.match(/[Cc]loses?\s+#(\d+)/g) || [];
+            for (const match of matches) {
+              const issueNum = match.match(/#(\d+)/)[1];
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(issueNum),
+                state: 'closed'
+              });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(issueNum),
+                body: `✅ Closed by #${context.payload.pull_request.number}`
+              });
+            }

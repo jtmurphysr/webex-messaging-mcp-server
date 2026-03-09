@@ -1,0 +1,54 @@
+name: Compound Learning
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  capture-learning:
+    if: contains(github.event.issue.labels.*.name, 'agent-task')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Capture learning
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number
+            });
+            const agentComments = comments.data
+              .filter(c => c.body.includes('Agent dispatched') || c.body.includes('Agent retrying') || c.body.includes('harness-gap'))
+              .length;
+            const retries = comments.data.filter(c => c.body.includes('/agent retry')).length;
+            const hadGap = issue.labels.some(l => l.name === 'harness-gap');
+            const learning = [
+              `### Issue #${issue.number} — ${issue.title}`,
+              `- **Dispatches**: ${agentComments}`,
+              `- **Retries**: ${retries}`,
+              `- **Harness gap**: ${hadGap ? 'Yes' : 'No'}`,
+              `- **Closed**: ${new Date().toISOString().split('T')[0]}`,
+              ''
+            ].join('\n');
+            core.exportVariable('LEARNING_ENTRY', learning);
+
+      - name: Append to AGENTS.md
+        run: |
+          echo "" >> AGENTS.md
+          echo "$LEARNING_ENTRY" >> AGENTS.md
+
+      - name: Commit learning
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add AGENTS.md
+          git diff --staged --quiet || git commit -m "learning: capture from issue #${{ github.event.issue.number }}"
+          git push

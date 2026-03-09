@@ -249,3 +249,10 @@ that should inform future work._
 - **Harness gap**: No
 - **Closed**: 2026-03-09
 
+
+### Issue #6 — Issue #006: tests/integration — comprehensive test suite for OAuth2 integration
+- **Dispatches**: 1
+- **Retries**: 1
+- **Harness gap**: No
+- **Closed**: 2026-03-09
+

@@ -3,8 +3,8 @@ import assert from 'node:assert'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
-import tokenStore from '../lib/token-store.js'
-import tokenProvider from '../lib/token-provider.js'
+import tokenStore from '../../lib/token-store.js'
+import tokenProvider from '../../lib/token-provider.js'
 
 describe('token-provider', () => {
   let tempDir

@@ -214,3 +214,10 @@ that should inform future work._
 - **What broke**: ...
 - **Convention added**: ...
 -->
+
+### Issue #1 — Issue #001: lib/token-store.js — credential file I/O and permissions management
+- **Dispatches**: 2
+- **Retries**: 2
+- **Harness gap**: No
+- **Closed**: 2026-03-09
+

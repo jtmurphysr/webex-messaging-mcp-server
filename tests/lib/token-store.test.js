@@ -3,7 +3,7 @@ import assert from 'node:assert'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
-import tokenStore from '../lib/token-store.js'
+import tokenStore from '../../lib/token-store.js'
 
 describe('token-store', () => {
   let tempDir

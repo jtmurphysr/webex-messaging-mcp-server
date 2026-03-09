@@ -6,8 +6,8 @@ import path from 'path'
 import os from 'os'
 
 // Import the classes we're testing
-import OAuthSetup from '../commands/auth-setup.js'
-import tokenStore from '../lib/token-store.js'
+import OAuthSetup from '../../commands/auth-setup.js'
+import tokenStore from '../../lib/token-store.js'
 
 describe('OAuth Setup Tests', () => {
   let testTempDir

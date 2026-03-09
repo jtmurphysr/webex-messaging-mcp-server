@@ -10,8 +10,8 @@ import {
   getBaseUrl,
   getHeaders,
   _resetProviderForTesting
-} from '../lib/webex-config.js';
-import tokenProvider from '../lib/token-provider.js';
+} from '../../lib/webex-config.js';
+import tokenProvider from '../../lib/token-provider.js';
 
 describe('Webex Configuration Module', () => {
   let originalEnv;

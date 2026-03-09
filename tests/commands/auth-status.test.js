@@ -5,9 +5,9 @@ import path from 'path'
 import os from 'os'
 
 // Import modules to test
-import showAuthStatus from '../commands/auth-status.js'
-import tokenProvider from '../lib/token-provider.js'
-import tokenStore from '../lib/token-store.js'
+import showAuthStatus from '../../commands/auth-status.js'
+import tokenProvider from '../../lib/token-provider.js'
+import tokenStore from '../../lib/token-store.js'
 
 describe('auth-status command', () => {
   let originalEnv

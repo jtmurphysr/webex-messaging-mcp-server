@@ -15,6 +15,7 @@
     "list-tools": "node index.js tools",
     "discover-tools": "node discover-tools.js",
     "auth:setup": "node commands/auth-setup.js",
+    "auth:status": "node commands/auth-status.js",
     "test": "node --test tests/*.test.js",
     "test:local": "npm test",
     "test:watch": "node --test --watch tests/*.test.js",

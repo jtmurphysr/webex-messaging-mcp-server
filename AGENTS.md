@@ -242,3 +242,10 @@ that should inform future work._
 - **Harness gap**: No
 - **Closed**: 2026-03-09
 
+
+### Issue #5 — Issue #005: commands/auth-status.js — token status reporter CLI
+- **Dispatches**: 1
+- **Retries**: 1
+- **Harness gap**: No
+- **Closed**: 2026-03-09
+

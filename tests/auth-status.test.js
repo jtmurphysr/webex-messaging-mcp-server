@@ -113,9 +113,9 @@ describe('auth-status command', () => {
 
     it('shows time until expiry in different formats', async () => {
       const testCases = [
-        { offset: 2 * 60 * 60 * 1000 + 5000, expected: 'in 2 hours' },
-        { offset: 25 * 60 * 60 * 1000, expected: 'in 1 day, 1 hour' },
-        { offset: 30 * 60 * 1000, expected: 'in 30 minutes' },
+        { offset: 2 * 60 * 60 * 1000 + 30000, expected: 'in 2 hours' },
+        { offset: 25 * 60 * 60 * 1000 + 30000, expected: 'in 1 day, 1 hour' },
+        { offset: 30 * 60 * 1000 + 30000, expected: 'in 30 minutes' },
         { offset: -1000, expected: 'expired' },
       ]
       

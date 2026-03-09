@@ -50,6 +50,7 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_tools: "Bash,Read,Write,Edit,LS,Glob,mcp__github_comment__update_claude_comment"
           direct_prompt: |
             You are operating in an agent-first repository. This is a Node.js project (plain JavaScript, not TypeScript).
 
@@ -109,6 +110,7 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_tools: "Bash,Read,Write,Edit,LS,Glob,mcp__github_comment__update_claude_comment"
           direct_prompt: |
             You are retrying a previous attempt. This is a Node.js project (plain JavaScript, not TypeScript).
 

@@ -87,7 +87,7 @@ the CI workflow runs the same gate independently.
 
 ### Style
 - **Plain JavaScript** — no TypeScript, no JSX, no transpilation
-- **CommonJS modules** — `require()` / `module.exports`, not ES module `import`/`export`
+- **ES modules** — `import` / `export`, not CommonJS `require()` / `module.exports` (package.json has `"type": "module"`)
 - **`fetch` for HTTP** — native Node.js fetch (18+), no axios, no node-fetch
 - **No semicolons or specific style enforced** — follow the existing patterns in each file
 

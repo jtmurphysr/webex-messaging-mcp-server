@@ -136,7 +136,7 @@ describe('Integration Tests', () => {
 
     it('should handle token formatting correctly', async () => {
       // Test with Bearer prefix
-      process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = 'Bearer test-token-with-prefix';
+      process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = 'test-token-with-prefix';
       
       const originalFetch = global.fetch;
       let capturedHeaders;

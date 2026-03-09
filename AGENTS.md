@@ -221,3 +221,10 @@ that should inform future work._
 - **Harness gap**: No
 - **Closed**: 2026-03-09
 
+
+### Issue #2 — Issue #002: lib/token-provider.js — auth mode detection and token lifecycle management
+- **Dispatches**: 1
+- **Retries**: 1
+- **Harness gap**: No
+- **Closed**: 2026-03-09
+

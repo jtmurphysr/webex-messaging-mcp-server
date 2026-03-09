@@ -141,6 +141,161 @@ Tools are organized by functionality:
 3. Copy the bearer token from the API documentation
 4. **Important**: Remove the "Bearer " prefix when adding to your `.env` file
 
+## OAuth2 Integration Setup
+
+For long-term deployment without manual token renewal, use OAuth2 Integration authentication. This allows the server to automatically refresh tokens and run indefinitely.
+
+### Prerequisites
+
+1. **Register a Webex Integration** at [developer.webex.com](https://developer.webex.com):
+   - Sign in with your Cisco/Webex account
+   - Navigate to "My Webex Apps" → "Create a New App" → "Integration"
+   - Configure the Integration with the following **minimum required scopes**:
+     - `spark:messages_read`, `spark:messages_write`
+     - `spark:rooms_read`, `spark:rooms_write`
+     - `spark:memberships_read`, `spark:memberships_write`
+     - `spark:people_read`
+     - `spark:teams_read`, `spark:teams_write`
+     - `spark:team_memberships_read`, `spark:team_memberships_write`
+     - `spark:webhooks_read`, `spark:webhooks_write`
+   - Set the **Redirect URI** to: `http://localhost:8000/callback` (or any available port)
+   - Save the **Client ID** and **Client Secret**
+
+### Setup Process
+
+1. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   # Edit .env and set:
+   WEBEX_CLIENT_ID=your_integration_client_id
+   WEBEX_CLIENT_SECRET=your_integration_client_secret
+   # Optionally set: WEBEX_AUTH_MODE=oauth
+   ```
+
+2. **Run the OAuth setup command:**
+   ```bash
+   npm run auth:setup
+   ```
+   
+   This command will:
+   - Open your browser to the Webex authorization page
+   - Prompt you to grant permissions to the Integration
+   - Capture the authorization code and exchange it for tokens
+   - Store the tokens securely in `~/.webex-mcp/tokens.json`
+
+3. **Verify the setup:**
+   ```bash
+   npm run auth:status
+   ```
+
+### Token Management
+
+- **Automatic Refresh**: Tokens are automatically refreshed before expiry (no manual intervention needed)
+- **Long-term Storage**: Refresh tokens are valid for 90 days of inactivity
+- **Security**: Token files are stored with `0600` permissions (owner read/write only)
+- **Custom Storage**: Override the default token location with `WEBEX_TOKEN_STORE_PATH`
+
+### Docker Deployment with OAuth2
+
+⚠️ **Important**: OAuth setup requires a browser and cannot be run inside Docker containers.
+
+**Setup Process for Docker:**
+
+1. **Run OAuth setup on the host machine first:**
+   ```bash
+   # On your host machine (not in Docker)
+   npm install
+   npm run auth:setup
+   ```
+
+2. **Mount the token directory as a Docker volume:**
+   ```bash
+   # Create a named volume for token persistence
+   docker volume create webex-mcp-tokens
+   
+   # Run with volume mount
+   docker run -i --rm \
+     --env-file .env \
+     -v webex-mcp-tokens:/home/mcp/.webex-mcp \
+     webex-mcp-server
+   ```
+
+3. **Docker Compose configuration:**
+   ```yaml
+   version: '3.8'
+   services:
+     webex-mcp-server:
+       build: .
+       environment:
+         - WEBEX_CLIENT_ID=${WEBEX_CLIENT_ID}
+         - WEBEX_CLIENT_SECRET=${WEBEX_CLIENT_SECRET}
+         - WEBEX_AUTH_MODE=oauth
+       volumes:
+         - webex-mcp-tokens:/home/mcp/.webex-mcp
+       stdin_open: true
+   
+   volumes:
+     webex-mcp-tokens:
+   ```
+
+### Backward Compatibility
+
+OAuth2 Integration is **fully backward compatible** with existing bearer token setups:
+
+- **Existing users**: Continue using `WEBEX_PUBLIC_WORKSPACE_API_KEY` without any changes
+- **Mixed environments**: Different instances can use different auth modes
+- **Migration**: No migration needed - OAuth2 and bearer token modes coexist
+- **Fallback**: If OAuth2 credentials are invalid, the system can fall back to bearer token mode
+
+### Authentication Mode Priority
+
+The server automatically detects the authentication mode using this priority:
+
+1. **OAuth2**: If `WEBEX_CLIENT_ID` and stored tokens are present
+2. **Bot Token**: If `WEBEX_BOT_TOKEN` is present  
+3. **Bearer Token**: If `WEBEX_PUBLIC_WORKSPACE_API_KEY` is present
+
+Override automatic detection with: `WEBEX_AUTH_MODE=oauth|bot|bearer`
+
+### Troubleshooting
+
+#### OAuth Setup Issues
+
+**Problem**: "Browser didn't open" or "Cannot access localhost"
+- **Solution**: The setup command outputs the authorization URL. Copy and paste it into your browser manually.
+
+**Problem**: "Permission denied" or "Scope insufficient" errors
+- **Solution**: Verify your Integration has all required scopes listed above. Re-register if needed.
+
+**Problem**: "Invalid redirect URI" 
+- **Solution**: Ensure the redirect URI in your Integration matches exactly: `http://localhost:8000/callback`
+
+#### Runtime Issues
+
+**Problem**: "Token refresh failed" or "401 Unauthorized"
+- **Solution**: Run `npm run auth:status` to check token expiry. If refresh token is expired (>90 days old), re-run `npm run auth:setup`
+
+**Problem**: "Token file not found" in Docker
+- **Solution**: Ensure the `~/.webex-mcp` directory is mounted as a volume and OAuth setup was completed on the host
+
+**Problem**: Tools returning "403 Forbidden" 
+- **Solution**: Check scopes with `npm run auth:status`. Your Integration may be missing required scopes for specific tools.
+
+#### Docker-Specific Issues
+
+**Problem**: "No such file or directory: ~/.webex-mcp/tokens.json"
+- **Solution**: 
+  1. Run OAuth setup on the host first: `npm run auth:setup`
+  2. Copy the token file to your Docker volume: 
+     ```bash
+     docker run --rm -v webex-mcp-tokens:/data -v ~/.webex-mcp:/source alpine cp -r /source/. /data/
+     ```
+
+**Problem**: Container crashes with "ENOENT: no such file or directory"
+- **Solution**: Ensure the volume mount path matches the container user home directory: `/home/mcp/.webex-mcp`
+
+For additional support, check the server logs or run with `DEBUG=1` for verbose output.
+
 ## MCP Client Integration
 
 ### Claude Desktop (STDIO Mode)

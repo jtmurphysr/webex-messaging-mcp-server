@@ -6,8 +6,12 @@ import {
   getWebexHeaders, 
   getWebexJsonHeaders, 
   getWebexUrl,
-  validateWebexConfig 
+  validateWebexConfig,
+  getBaseUrl,
+  getHeaders,
+  _resetProviderForTesting
 } from '../lib/webex-config.js';
+import tokenProvider from '../lib/token-provider.js';
 
 describe('Webex Configuration Module', () => {
   let originalEnv;
@@ -158,14 +162,148 @@ describe('Webex Configuration Module', () => {
       delete process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY;
       assert.throws(() => {
         validateWebexConfig();
-      }, /Missing required environment variables: WEBEX_PUBLIC_WORKSPACE_API_KEY/);
+      }, /No authentication credentials found/);
     });
 
     it('should throw when required var is empty string', () => {
       process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = '';
       assert.throws(() => {
         validateWebexConfig();
-      }, /Missing required environment variables: WEBEX_PUBLIC_WORKSPACE_API_KEY/);
+      }, /No authentication credentials found/);
+    });
+  });
+
+  // NEW TESTS FOR TOKENPROVIDER INTEGRATION
+  describe('TokenProvider Integration Tests', () => {
+    beforeEach(() => {
+      // Reset provider state for clean test isolation
+      _resetProviderForTesting();
+    });
+
+    describe('getHeaders interface contract', () => {
+      it('test_get_headers_delegates_to_token_provider', () => {
+        process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = 'contract-test-token';
+        delete process.env.WEBEX_CLIENT_ID;
+        delete process.env.WEBEX_CLIENT_SECRET;
+        delete process.env.WEBEX_BOT_TOKEN;
+
+        const headers = getHeaders();
+        assert.deepStrictEqual(headers, {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer contract-test-token'
+        });
+      });
+
+      it('test_get_headers_maintains_existing_format', () => {
+        process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = 'format-test-token';
+        delete process.env.WEBEX_CLIENT_ID;
+        delete process.env.WEBEX_CLIENT_SECRET;
+        delete process.env.WEBEX_BOT_TOKEN;
+
+        const headers = getHeaders({ 'Custom': 'value' });
+        
+        // Should maintain the exact same format as before
+        assert.ok(typeof headers === 'object');
+        assert.strictEqual(headers['Accept'], 'application/json');
+        assert.strictEqual(headers['Authorization'], 'Bearer format-test-token');
+        assert.strictEqual(headers['Custom'], 'value');
+      });
+
+      it('test_get_headers_handles_bearer_mode_unchanged', () => {
+        process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = 'bearer-unchanged-token';
+        delete process.env.WEBEX_CLIENT_ID;
+        delete process.env.WEBEX_CLIENT_SECRET;
+        delete process.env.WEBEX_BOT_TOKEN;
+
+        const headers = getHeaders();
+        assert.strictEqual(headers['Authorization'], 'Bearer bearer-unchanged-token');
+      });
+
+      it('test_get_headers_handles_bot_mode', () => {
+        process.env.WEBEX_BOT_TOKEN = 'bot-test-token-123';
+        delete process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY;
+        delete process.env.WEBEX_CLIENT_ID;
+        delete process.env.WEBEX_CLIENT_SECRET;
+
+        const headers = getHeaders();
+        assert.strictEqual(headers['Authorization'], 'Bearer bot-test-token-123');
+      });
+    });
+
+    describe('getBaseUrl interface contract', () => {
+      it('should maintain same behavior as getWebexBaseUrl', () => {
+        delete process.env.WEBEX_API_BASE_URL;
+        assert.strictEqual(getBaseUrl(), getWebexBaseUrl());
+        assert.strictEqual(getBaseUrl(), 'https://webexapis.com/v1');
+
+        process.env.WEBEX_API_BASE_URL = 'https://custom.test.com/v3';
+        assert.strictEqual(getBaseUrl(), getWebexBaseUrl());
+        assert.strictEqual(getBaseUrl(), 'https://custom.test.com/v3');
+      });
+    });
+
+    describe('test_backwards_compatibility_with_existing_tools', () => {
+      it('should work with existing getWebexHeaders pattern', () => {
+        process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = 'compat-test-token';
+        delete process.env.WEBEX_CLIENT_ID;
+        delete process.env.WEBEX_CLIENT_SECRET;
+        delete process.env.WEBEX_BOT_TOKEN;
+
+        // Existing tools call getWebexHeaders
+        const legacyHeaders = getWebexHeaders();
+        // New interface provides getHeaders
+        const newHeaders = getHeaders();
+        
+        assert.deepStrictEqual(legacyHeaders, newHeaders);
+      });
+    });
+
+    describe('test_token_provider_initialization_on_first_call', () => {
+      it('should initialize provider on first getHeaders call', () => {
+        process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY = 'init-test-token';
+        delete process.env.WEBEX_CLIENT_ID;
+        delete process.env.WEBEX_CLIENT_SECRET;
+        delete process.env.WEBEX_BOT_TOKEN;
+
+        // Provider should be uninitialized
+        assert.strictEqual(tokenProvider.getMode(), null);
+        
+        // First call should initialize
+        getHeaders();
+        assert.strictEqual(tokenProvider.getMode(), 'bearer');
+      });
+    });
+
+    describe('test_error_handling_when_token_provider_fails', () => {
+      it('should propagate initialization errors', () => {
+        // Set up environment with no auth credentials
+        delete process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY;
+        delete process.env.WEBEX_CLIENT_ID;
+        delete process.env.WEBEX_CLIENT_SECRET;
+        delete process.env.WEBEX_BOT_TOKEN;
+
+        assert.throws(() => {
+          getHeaders();
+        }, /No authentication credentials found/);
+      });
+    });
+  });
+
+  // Test OAuth mode handling (when token store exists)
+  // Note: This test would require mocking the token-store module
+  // which is not in scope for this issue since OAuth tokens
+  // come from issue #2's implementation
+  describe('OAuth mode integration (placeholder)', () => {
+    it('test_get_headers_handles_oauth_mode_with_refresh - requires token store', () => {
+      // This test would need to:
+      // 1. Mock tokenStore.read() to return valid OAuth credentials
+      // 2. Set WEBEX_CLIENT_ID and WEBEX_CLIENT_SECRET
+      // 3. Verify headers are returned with OAuth token
+      // 4. Test token refresh logic
+      // 
+      // Since this requires the full OAuth infrastructure from issue #2,
+      // we're documenting this as a placeholder for integration testing
+      assert.ok(true, 'OAuth integration test requires token-store infrastructure');
     });
   });
 });

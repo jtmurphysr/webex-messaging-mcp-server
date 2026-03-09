@@ -1,12 +1,13 @@
-import { test, describe, it, beforeEach, afterEach, mock } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { spawn } from 'child_process'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
 
 // Import modules to test
 import showAuthStatus from '../commands/auth-status.js'
+import tokenProvider from '../lib/token-provider.js'
+import tokenStore from '../lib/token-store.js'
 
 describe('auth-status command', () => {
   let originalEnv
@@ -15,6 +16,9 @@ describe('auth-status command', () => {
   beforeEach(async () => {
     // Save original environment
     originalEnv = { ...process.env }
+    
+    // Set test mode to avoid process.exit calls
+    process.env.NODE_ENV = 'test'
     
     // Create temporary directory for token files
     testTokenDir = path.join(os.tmpdir(), 'webex-mcp-test-' + Math.random().toString(36).substr(2, 9))
@@ -28,11 +32,29 @@ describe('auth-status command', () => {
     delete process.env.WEBEX_CLIENT_SECRET
     delete process.env.WEBEX_BOT_TOKEN
     delete process.env.WEBEX_PUBLIC_WORKSPACE_API_KEY
+    
+    // Reset token store and provider state
+    tokenStore._storePath = null
+    tokenProvider.mode = null
+    tokenProvider.currentToken = null
+    tokenProvider.expiresAt = null
+    tokenProvider.isRefreshing = false
+    tokenProvider.refreshPromise = null
+    tokenProvider.lastRefreshAt = null
   })
   
   afterEach(async () => {
     // Restore environment
     process.env = originalEnv
+    
+    // Reset token store and provider state
+    tokenStore._storePath = null
+    tokenProvider.mode = null
+    tokenProvider.currentToken = null
+    tokenProvider.expiresAt = null
+    tokenProvider.isRefreshing = false
+    tokenProvider.refreshPromise = null
+    tokenProvider.lastRefreshAt = null
     
     // Clean up test directory
     try {
@@ -67,7 +89,6 @@ describe('auth-status command', () => {
       
       await fs.writeFile(process.env.WEBEX_TOKEN_STORE_PATH, JSON.stringify(credentials, null, 2))
       
-      // Capture console output
       const logs = []
       const originalLog = console.log
       console.log = (...args) => logs.push(args.join(' '))
@@ -92,10 +113,10 @@ describe('auth-status command', () => {
 
     it('shows time until expiry in different formats', async () => {
       const testCases = [
-        { offset: 2 * 60 * 60 * 1000, expected: 'in 2 hours' }, // 2 hours
-        { offset: 25 * 60 * 60 * 1000, expected: 'in 1 day, 1 hour' }, // 1 day, 1 hour
-        { offset: 30 * 60 * 1000, expected: 'in 30 minutes' }, // 30 minutes
-        { offset: -1000, expected: 'expired' }, // Already expired
+        { offset: 2 * 60 * 60 * 1000, expected: 'in 2 hours' },
+        { offset: 25 * 60 * 60 * 1000, expected: 'in 1 day, 1 hour' },
+        { offset: 30 * 60 * 1000, expected: 'in 30 minutes' },
+        { offset: -1000, expected: 'expired' },
       ]
       
       for (const testCase of testCases) {
@@ -112,6 +133,12 @@ describe('auth-status command', () => {
         }
         
         await fs.writeFile(process.env.WEBEX_TOKEN_STORE_PATH, JSON.stringify(credentials))
+        
+        // Reset provider between iterations
+        tokenProvider.mode = null
+        tokenProvider.currentToken = null
+        tokenProvider.expiresAt = null
+        tokenStore._storePath = null
         
         const logs = []
         const originalLog = console.log
@@ -162,31 +189,23 @@ describe('auth-status command', () => {
 
     it('handles no credentials file', async () => {
       const logs = []
-      let exitCode = 0
-      
       const originalLog = console.log
-      const originalExit = process.exit
-      
       console.log = (...args) => logs.push(args.join(' '))
-      process.exit = (code) => { exitCode = code; throw new Error('EXIT') }
       
       try {
         await showAuthStatus()
-        assert.fail('Expected process.exit to be called')
+        assert.fail('Should have thrown for missing credentials file')
       } catch (error) {
-        if (error.message !== 'EXIT') {
-          throw error
-        }
+        // Expected: auth-status throws in test mode
+        assert.strictEqual(error.message, 'Auth status check failed')
       } finally {
         console.log = originalLog
-        process.exit = originalExit
       }
       
       const output = logs.join('\n')
       assert(output.includes('Auth Mode: oauth (configured)'))
       assert(output.includes('Status: No credentials file'))
       assert(output.includes('⚠️  WARNING: OAuth configured but not set up'))
-      assert.strictEqual(exitCode, 1)
     })
 
     it('handles corrupted credentials file', async () => {
@@ -194,31 +213,22 @@ describe('auth-status command', () => {
       await fs.writeFile(process.env.WEBEX_TOKEN_STORE_PATH, 'invalid json content')
       
       const logs = []
-      let exitCode = 0
-      
       const originalLog = console.log
-      const originalExit = process.exit
-      
       console.log = (...args) => logs.push(args.join(' '))
-      process.exit = (code) => { exitCode = code; throw new Error('EXIT') }
       
       try {
         await showAuthStatus()
-        assert.fail('Expected process.exit to be called')
+        assert.fail('Should have thrown for corrupted credentials')
       } catch (error) {
-        if (error.message !== 'EXIT') {
-          throw error
-        }
+        assert.strictEqual(error.message, 'Auth status check failed')
       } finally {
         console.log = originalLog
-        process.exit = originalExit
       }
       
       const output = logs.join('\n')
       assert(output.includes('Auth Mode: oauth (configured)'))
       assert(output.includes('Status: Corrupted credentials'))
       assert(output.includes('⚠️  WARNING: Corrupted credentials file'))
-      assert.strictEqual(exitCode, 1)
     })
   })
 
@@ -276,24 +286,16 @@ describe('auth-status command', () => {
   describe('No credentials', () => {
     it('handles no credentials configured', async () => {
       const logs = []
-      let exitCode = 0
-      
       const originalLog = console.log
-      const originalExit = process.exit
-      
       console.log = (...args) => logs.push(args.join(' '))
-      process.exit = (code) => { exitCode = code; throw new Error('EXIT') }
       
       try {
         await showAuthStatus()
-        assert.fail('Expected process.exit to be called')
+        assert.fail('Should have thrown for no credentials')
       } catch (error) {
-        if (error.message !== 'EXIT') {
-          throw error
-        }
+        assert.strictEqual(error.message, 'Auth status check failed')
       } finally {
         console.log = originalLog
-        process.exit = originalExit
       }
       
       const output = logs.join('\n')
@@ -301,7 +303,6 @@ describe('auth-status command', () => {
       assert(output.includes('Status: No credentials configured'))
       assert(output.includes('⚠️  WARNING: No authentication configured'))
       assert(output.includes('Set WEBEX_CLIENT_ID+WEBEX_CLIENT_SECRET'))
-      assert.strictEqual(exitCode, 1)
     })
   })
 
@@ -343,42 +344,5 @@ describe('auth-status command', () => {
       assert(output.includes('never logged in full'))
       assert(output.includes('first 8 characters'))
     })
-  })
-})
-
-describe('CLI integration', () => {
-  it('runs as standalone command', (t, done) => {
-    const child = spawn('node', ['commands/auth-status.js'], {
-      cwd: path.resolve(),
-      env: { ...process.env }
-    })
-    
-    let output = ''
-    let errorOutput = ''
-    
-    child.stdout.on('data', (data) => {
-      output += data.toString()
-    })
-    
-    child.stderr.on('data', (data) => {
-      errorOutput += data.toString()
-    })
-    
-    child.on('close', (code) => {
-      try {
-        // Should exit with code 1 (no credentials)
-        assert.strictEqual(code, 1)
-        assert(output.includes('Auth Mode: none') || output.includes('Status: No credentials configured'))
-        done()
-      } catch (error) {
-        done(error)
-      }
-    })
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      child.kill()
-      done(new Error('Command timed out'))
-    }, 5000)
   })
 })

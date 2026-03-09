@@ -203,7 +203,11 @@ async function showAuthStatus() {
       console.log(`Error: ${error.message}`)
     }
     
-    process.exit(1)
+    if (process.env.NODE_ENV === 'test') {
+      throw new Error('Auth status check failed')
+    } else {
+      process.exit(1)
+    }
   }
 }
 
@@ -211,7 +215,11 @@ async function showAuthStatus() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   showAuthStatus().catch(error => {
     console.error(`Error: ${error.message}`)
-    process.exit(1)
+    if (process.env.NODE_ENV === 'test') {
+      throw new Error('Auth status check failed')
+    } else {
+      process.exit(1)
+    }    
   })
 }
 

@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { discoverTools } from '../lib/tools.js';
+import { _resetProviderForTesting } from '../lib/webex-config.js';
 
 describe('Integration Tests', () => {
   let originalEnv;
@@ -108,6 +109,9 @@ describe('Integration Tests', () => {
   });
 
   describe('Configuration Integration', () => {
+    beforeEach(() => {
+      _resetProviderForTesting();
+    });
     it('should work with different base URLs', async () => {
       process.env.WEBEX_API_BASE_URL = 'https://custom.webex.com/v2';
       

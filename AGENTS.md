@@ -256,3 +256,10 @@ that should inform future work._
 - **Harness gap**: No
 - **Closed**: 2026-03-09
 
+
+### Issue #7 — Issue #007: documentation — README and .env.example updates for OAuth2 setup
+- **Dispatches**: 1
+- **Retries**: 1
+- **Harness gap**: No
+- **Closed**: 2026-03-10
+
